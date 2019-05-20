@@ -1,0 +1,91 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  mail-call-notifier
+
+  SAM template for mail-call-notifier
+
+Parameters:
+  Domain:
+    Default: 'example.com'
+    Type: String
+  TwilioSID:
+    Type: String
+  TwilioAuthToken:
+    Type: String
+  TwilioNumber:
+    Type: String
+
+Resources:
+  NotifierFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: notifier/
+      Handler: app.lambdaHandler
+      Runtime: nodejs8.10
+      Environment:
+        Variables:
+          TWILIO_ACCOUNT_SID: !Ref TwilioSID
+          TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
+          TWILIO_NUMBER: !Ref TwilioNumber
+      Events:
+        Notifier:
+          Type: SNS
+          Properties:
+            Topic: !Ref Topic
+      Timeout: 15
+  Topic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: !Sub "${Domain} mail notifier"
+  Bucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Sub "${Domain}-mail-receive"
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref Bucket
+      PolicyDocument:
+        Statement:
+          -
+            Sid: "AllowSESPuts"
+            Effect: "Allow"
+            Principal:
+              Service: "ses.amazonaws.com"
+            Action:
+              - "s3:PutObject"
+            Resource:
+              Fn::Join:
+                - ""
+                -
+                  - "arn:aws:s3:::"
+                  -
+                    Ref: Bucket
+                  - "/*"
+            Condition:
+              StringEquals:
+                aws:Referer: !Ref AWS::AccountId
+
+  ReceiptRuleSet:
+    Type: AWS::SES::ReceiptRuleSet
+    Properties:
+      RuleSetName: !Sub "${AWS::StackName}-rule-set"
+  ReceiptRule:
+    Type: AWS::SES::ReceiptRule
+    Properties:
+      Rule:
+        Actions:
+          - S3Action:
+              BucketName: !Ref Bucket
+          - SNSAction:
+              TopicArn: !Ref Topic
+        Enabled: true
+        Name: !Sub "${Domain}-mail-receive"
+        Recipients:
+          - !Sub "${Domain}"
+          - !Sub ".${Domain}"
+        ScanEnabled: true
+        TlsPolicy: Optional
+      RuleSetName: !Ref ReceiptRuleSet
