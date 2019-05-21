@@ -28,12 +28,33 @@ Resources:
           TWILIO_ACCOUNT_SID: !Ref TwilioSID
           TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
           TWILIO_NUMBER: !Ref TwilioNumber
+          DYNAMODB_TABLE: !Ref NotifierTable
       Events:
         Notifier:
           Type: SNS
           Properties:
             Topic: !Ref Topic
+      MemorySize: 256
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref NotifierTable
       Timeout: 15
+  NotifierTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: "id"
+          AttributeType: "S"
+        - AttributeName: "timestamp_status-username"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "id"
+          KeyType: "HASH"
+        - AttributeName: "timestamp_status-username"
+          KeyType: "RANGE"
+      ProvisionedThroughput:
+        ReadCapacityUnits: "5"
+        WriteCapacityUnits: "5"
   Topic:
     Type: AWS::SNS::Topic
     Properties:
