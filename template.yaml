@@ -7,7 +7,6 @@ Description: >
 
 Parameters:
   Domain:
-    Default: 'example.com'
     Type: String
   TwilioSID:
     Type: String
@@ -66,12 +65,12 @@ Resources:
       AttributeDefinitions:
         - AttributeName: "id"
           AttributeType: "S"
-        - AttributeName: "timestamp_status-username"
+        - AttributeName: "sortkey"
           AttributeType: "S"
       KeySchema:
         - AttributeName: "id"
           KeyType: "HASH"
-        - AttributeName: "timestamp_status-username"
+        - AttributeName: "sortkey"
           KeyType: "RANGE"
       ProvisionedThroughput:
         ReadCapacityUnits: "5"

@@ -10,32 +10,30 @@ exports.lambdaHandler = async (event, context) => {
     let commonHeaders = message.mail.commonHeaders;
     let notification = "New mail from: " + commonHeaders.from[0] + " to: " + commonHeaders.to[0] + " with subject: " + commonHeaders.subject;
     console.log(notification);
+
     try {
         let item = {
             "id": message.mail.messageId,
-            "timestamp_status-username": message.mail.timestamp,
+            "sortkey": message.mail.timestamp,
             "from": commonHeaders.from,
             "to": commonHeaders.to,
             "subject": commonHeaders.subject
         };
         let data = await putItem(item);
-        console.log("Put item in DynamoDB: " + JSON.stringify(data));
-    } catch (e) {
-        console.error(e);
-    }
 
-    try {
-        let sms = await sendTwilioMessage(notification, "+393402344097", process.env.TWILIO_NUMBER);
+        data = await getUsersOnCall();
+        let username = data.Items[0].sortkey.split("#")[2];
+        let phone = data.Items[0].phone;
+        console.log("Contacting " + username + " at phone: " + phone);
+
+        let sms = await sendTwilioMessage(notification, phone, process.env.TWILIO_NUMBER);
         console.log("Twilio message id: " + sms.sid);
-    } catch (e) {
-        console.error(e);
-    }
 
-    try {
-        let call = await startTwilioCall(process.env.RESPONSE_API_URL + message.mail.messageId, "+393402344097", process.env.TWILIO_NUMBER);
+        let call = await startTwilioCall(process.env.RESPONSE_API_URL + message.mail.messageId, phone, process.env.TWILIO_NUMBER);
         console.log("Twilio call id: " + call.sid);
     } catch (e) {
         console.error(e);
+        return e;
     }
 
     return "Success";
@@ -47,6 +45,15 @@ function putItem(item) {
         Item: item
     };
     return ddb.put(params).promise();
+}
+
+function getUsersOnCall() {
+    let params = {
+        TableName: process.env.DYNAMODB_TABLE,
+        KeyConditionExpression: "id = :u AND begins_with(sortkey, :status)",
+        ExpressionAttributeValues: { ":u" : "user", ":status" : "ONCALL#" }
+    };
+    return ddb.query(params).promise();
 }
 
 async function sendTwilioMessage (body, to, from) {
