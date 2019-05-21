@@ -29,6 +29,7 @@ Resources:
           TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
           TWILIO_NUMBER: !Ref TwilioNumber
           DYNAMODB_TABLE: !Ref NotifierTable
+          RESPONSE_API_URL: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/response/"
       Events:
         Notifier:
           Type: SNS
@@ -39,6 +40,26 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: !Ref NotifierTable
       Timeout: 15
+  ResponseFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: response/
+      Handler: app.lambdaHandler
+      Runtime: nodejs8.10
+      Environment:
+        Variables:
+          DYNAMODB_TABLE: !Ref NotifierTable
+      Events:
+        Response:
+          Type: Api
+          Properties:
+            Path: /response/{id}
+            Method: any
+      MemorySize: 128
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref NotifierTable
+      Timeout: 5
   NotifierTable:
     Type: AWS::DynamoDB::Table
     Properties:

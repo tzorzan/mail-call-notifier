@@ -1,0 +1,27 @@
+{
+  "name": "response",
+  "version": "1.0.0",
+  "description": "Response function written in NodeJS",
+  "main": "app.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tzorzan/mail-call-notifier.git"
+  },
+  "author": "SAM CLI",
+  "license": "MIT",
+  "dependencies": {
+    "aws-sdk": "^2.459.0",
+    "twilio": "^3.31.0"
+  },
+  "scripts": {
+    "test": "mocha tests/unit/"
+  },
+  "devDependencies": {
+    "chai": "^4.1.2",
+    "mocha": "^5.1.1"
+  },
+  "directories": {
+    "test": "tests"
+  },
+  "keywords": []
+}

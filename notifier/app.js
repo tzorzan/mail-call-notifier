@@ -32,12 +32,11 @@ exports.lambdaHandler = async (event, context) => {
     }
 
     try {
-        let call = await startTwilioCall("http://demo.twilio.com/docs/voice.xml", "+393402344097", process.env.TWILIO_NUMBER);
+        let call = await startTwilioCall(process.env.RESPONSE_API_URL + message.mail.messageId, "+393402344097", process.env.TWILIO_NUMBER);
         console.log("Twilio call id: " + call.sid);
     } catch (e) {
         console.error(e);
     }
-
 
     return "Success";
 };
