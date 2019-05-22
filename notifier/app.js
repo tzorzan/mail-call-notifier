@@ -1,11 +1,11 @@
 let AWS = require('aws-sdk');
 AWS.config.update({region: process.env.AWS_REGION});
 let ddb = new AWS.DynamoDB.DocumentClient();
-
+let moment = require('moment');
 let twilio = require('twilio');
 let client = new twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
-exports.lambdaHandler = async (event, context) => {
+exports.lambdaHandler = async (event) => {
     let message = JSON.parse(event.Records[0].Sns.Message);
     let commonHeaders = message.mail.commonHeaders;
     let notification = "New mail from: " + commonHeaders.from[0] + " to: " + commonHeaders.to[0] + " with subject: " + commonHeaders.subject;
@@ -19,11 +19,18 @@ exports.lambdaHandler = async (event, context) => {
             "to": commonHeaders.to,
             "subject": commonHeaders.subject
         };
-        let data = await putItem(item);
+        await putItem(item);
+        let data = await getUsersOnCall();
 
-        data = await getUsersOnCall();
-        let username = data.Items[0].sortkey.split("#")[2];
-        let phone = data.Items[0].phone;
+        let availableUsers = data.Items.filter( user => userIsOnDuty(user));
+        if(availableUsers.length < 1) {
+            // noinspection ExceptionCaughtLocallyJS
+            throw new Error("No user on-call to contact.")
+        }
+
+        let username = availableUsers[0].sortkey.split("#")[2];
+        let phone = availableUsers[0].phone;
+
         console.log("Contacting " + username + " at phone: " + phone);
 
         let sms = await sendTwilioMessage(notification, phone, process.env.TWILIO_NUMBER);
@@ -33,7 +40,7 @@ exports.lambdaHandler = async (event, context) => {
         console.log("Twilio call id: " + call.sid);
     } catch (e) {
         console.error(e);
-        return e;
+        return e.toString();
     }
 
     return "Success";
@@ -54,6 +61,26 @@ function getUsersOnCall() {
         ExpressionAttributeValues: { ":u" : "user", ":status" : "ONCALL#" }
     };
     return ddb.query(params).promise();
+}
+
+function userIsOnDuty(user) {
+    let onduty = checkShiftDays(user.days) && checkShiftHours(user.hours);
+    console.log(user.sortkey.split("#")[2] + " is on-call, checking if it is on duty: " + onduty);
+    return onduty;
+}
+
+function checkShiftDays(shift) {
+    let today = moment().isoWeekday();
+    let start = moment(shift.split("-")[0], "ddd").isoWeekday();
+    let end = moment(shift.split("-")[1], "ddd").isoWeekday();
+    return start <= end ? today >= start && today <= end : !(today > end && today < start);
+}
+
+function checkShiftHours(shift) {
+    let now = moment();
+    let start = moment(shift.split("-")[0], "HH:mm");
+    let end = moment(shift.split("-")[1], "HH:mm");
+    return start <= end ? now >= start && now <= end : !(now > end && now < start);
 }
 
 async function sendTwilioMessage (body, to, from) {
